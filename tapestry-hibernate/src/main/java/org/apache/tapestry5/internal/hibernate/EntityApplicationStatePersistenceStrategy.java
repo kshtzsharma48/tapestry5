@@ -13,79 +13,80 @@
 // limitations under the License.
 package org.apache.tapestry5.internal.hibernate;
 
-import java.io.Serializable;
-
+import org.apache.tapestry5.hibernate.HibernateServiceLocator;
 import org.apache.tapestry5.internal.services.SessionApplicationStatePersistenceStrategy;
 import org.apache.tapestry5.services.ApplicationStateCreator;
 import org.apache.tapestry5.services.Request;
 import org.hibernate.HibernateException;
+import org.hibernate.Session;
+
+import java.io.Serializable;
 
 /**
  * Persists Hibernate entities as SSOs by storing their primary key in the {@link org.apache.tapestry5.services.Session}.
- * 
+ *
  * @see org.apache.tapestry5.internal.hibernate.PersistedEntity
  */
-public class EntityApplicationStatePersistenceStrategy extends SessionApplicationStatePersistenceStrategy 
+public class EntityApplicationStatePersistenceStrategy extends SessionApplicationStatePersistenceStrategy
 {
+    private final HibernateServiceLocator locator;
 
-	private final org.hibernate.Session hibernateSession;
+    public EntityApplicationStatePersistenceStrategy(Request request,
+                                                     HibernateServiceLocator locator)
+    {
+        super(request);
+        this.locator = locator;
+    }
 
-	public EntityApplicationStatePersistenceStrategy(Request request, org.hibernate.Session hibernateSession) 
-	{
-		super(request);
-		this.hibernateSession = hibernateSession;
-	}
+    @SuppressWarnings("unchecked")
+    public <T> T get(Class<T> ssoClass, ApplicationStateCreator<T> creator)
+    {
+        final Object persistedValue = getOrCreate(ssoClass, creator);
 
-	@SuppressWarnings("unchecked")
-	public <T> T get(Class<T> ssoClass, ApplicationStateCreator<T> creator) 
-	{
-		final Object persistedValue =  getOrCreate(ssoClass, creator);
-		
-		if(persistedValue instanceof PersistedEntity)
-		{
-			final PersistedEntity persisted = (PersistedEntity) persistedValue;
-			
-			Object restored = persisted.restore(this.hibernateSession);
-			
-			//shall we maybe throw an exception instead?
-			if(restored == null)
-			{
-				set(ssoClass, null);
-				return (T) getOrCreate(ssoClass, creator);
-			}
+        if (persistedValue instanceof PersistedEntity)
+        {
+            final PersistedEntity persisted = (PersistedEntity) persistedValue;
 
-			return (T) restored;
-		}
-		
-		return (T) persistedValue;
-	}
+            Object restored = persisted.restore(locator);
 
-	public <T> void set(Class<T> ssoClass, T sso) 
-	{	
-		final String key = buildKey(ssoClass);
-		Object entity;
-		
-		if(sso != null)
-		{
-			try 
-			{
-				final String entityName = this.hibernateSession.getEntityName(sso);
-				final Serializable id = this.hibernateSession.getIdentifier(sso);
-	
-				entity = new PersistedEntity(entityName, id);
-			} 
-			catch (final HibernateException ex) 
-			{
-				// if entity not attached to a Hibernate Session yet, store it as usual sso
-				entity = sso;
-			}
-		}
-		else
-		{
-			entity = sso;
-		}
-		
-		getSession().setAttribute(key, entity);
-	}
+            //shall we maybe throw an exception instead?
+            if (restored == null)
+            {
+                set(ssoClass, null);
+                return (T) getOrCreate(ssoClass, creator);
+            }
+
+            return (T) restored;
+        }
+
+        return (T) persistedValue;
+    }
+
+    public <T> void set(Class<T> ssoClass, T sso)
+    {
+        final String key = buildKey(ssoClass);
+        Object entity;
+
+        if (sso != null)
+        {
+            try
+            {
+                Session session = locator.getSession(ssoClass);
+                final String entityName = session.getEntityName(sso);
+                final Serializable id = session.getIdentifier(sso);
+
+                entity = new PersistedEntity(entityName, id);
+            } catch (final HibernateException ex)
+            {
+                // if entity not attached to a Hibernate Session yet, store it as usual sso
+                entity = sso;
+            }
+        } else
+        {
+            entity = sso;
+        }
+
+        getSession().setAttribute(key, entity);
+    }
 
 }

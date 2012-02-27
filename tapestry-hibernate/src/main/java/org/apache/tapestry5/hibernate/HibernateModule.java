@@ -14,9 +14,8 @@
 
 package org.apache.tapestry5.hibernate;
 
-import java.util.Iterator;
-
 import org.apache.tapestry5.ValueEncoder;
+import org.apache.tapestry5.hibernate.annotations.DefaultFactory;
 import org.apache.tapestry5.internal.InternalConstants;
 import org.apache.tapestry5.internal.hibernate.CommitAfterWorker;
 import org.apache.tapestry5.internal.hibernate.EntityApplicationStatePersistenceStrategy;
@@ -34,7 +33,6 @@ import org.apache.tapestry5.ioc.services.ServiceOverride;
 import org.apache.tapestry5.ioc.services.TypeCoercer;
 import org.apache.tapestry5.services.ApplicationStateContribution;
 import org.apache.tapestry5.services.ApplicationStatePersistenceStrategy;
-import org.apache.tapestry5.services.ComponentClassTransformWorker;
 import org.apache.tapestry5.services.LibraryMapping;
 import org.apache.tapestry5.services.PersistentFieldStrategy;
 import org.apache.tapestry5.services.ValueEncoderFactory;
@@ -42,12 +40,17 @@ import org.apache.tapestry5.services.transform.ComponentClassTransformWorker2;
 import org.hibernate.Session;
 import org.hibernate.mapping.PersistentClass;
 
+import java.lang.annotation.Annotation;
+import java.util.Iterator;
+
 /**
  * Supplements the services defined by {@link org.apache.tapestry5.hibernate.HibernateCoreModule} with additional
  * services and configuration specific to Tapestry web application.
  */
+@SuppressWarnings({"UnusedDeclaration"})
 public class HibernateModule
 {
+
     public static void contributeFactoryDefaults(MappedConfiguration<String, String> configuration)
     {
         configuration.add(HibernateSymbols.PROVIDE_ENTITY_VALUE_ENCODERS, "true");
@@ -58,12 +61,36 @@ public class HibernateModule
      * Contributes the package "&lt;root&gt;.entities" to the configuration, so that it will be scanned for annotated
      * entity classes.
      */
-    public static void contributeHibernateEntityPackageManager(Configuration<String> configuration,
-
-    @Symbol(InternalConstants.TAPESTRY_APP_PACKAGE_PARAM)
-    String appRootPackage)
+    public static void contributeHibernateSessionSource(
+            OrderedConfiguration<HibernateConfigurer> configuration,
+            @Symbol(HibernateSymbols.DEFAULT_CONFIGURATION)
+            final boolean defaultConfiguration,
+            @Symbol(InternalConstants.TAPESTRY_APP_PACKAGE_PARAM)
+            final String appRootPackage)
     {
-        configuration.add(appRootPackage + ".entities");
+        if (defaultConfiguration)
+        {
+            configuration.add("default", new HibernateConfigurer()
+            {
+                public void configure(org.hibernate.cfg.Configuration configuration)
+                {
+
+                }
+
+                public Class<? extends Annotation> getMarker()
+                {
+                    return DefaultFactory.class;
+                }
+
+                public String[] getPackageNames()
+                {
+                    return new String[]{
+                            appRootPackage + ".entities"
+                    };
+                }
+
+            });
+        }
     }
 
     @Contribute(ServiceOverride.class)
@@ -80,33 +107,39 @@ public class HibernateModule
      */
     @SuppressWarnings("unchecked")
     public static void contributeValueEncoderSource(MappedConfiguration<Class, ValueEncoderFactory> configuration,
-            @Symbol(HibernateSymbols.PROVIDE_ENTITY_VALUE_ENCODERS)
-            boolean provideEncoders, final HibernateSessionSource sessionSource, final Session session,
-            final TypeCoercer typeCoercer, final PropertyAccess propertyAccess, final LoggerSource loggerSource)
+                                                    @Symbol(HibernateSymbols.PROVIDE_ENTITY_VALUE_ENCODERS)
+                                                    boolean provideEncoders,
+                                                    final HibernateSessionSource sessionSource,
+                                                    final HibernateServiceLocator locator,
+                                                    final TypeCoercer typeCoercer, final PropertyAccess propertyAccess,
+                                                    final LoggerSource loggerSource)
     {
         if (!provideEncoders)
             return;
 
-        org.hibernate.cfg.Configuration config = sessionSource.getConfiguration();
-        Iterator<PersistentClass> mappings = config.getClassMappings();
-        while (mappings.hasNext())
+        for (org.hibernate.cfg.Configuration config : sessionSource.getConfigurations())
         {
-            final PersistentClass persistentClass = mappings.next();
-            final Class entityClass = persistentClass.getMappedClass();
-
-            if (entityClass != null)
+            Iterator<PersistentClass> mappings = config.getClassMappings();
+            while (mappings.hasNext())
             {
-                ValueEncoderFactory factory = new ValueEncoderFactory()
+                final PersistentClass persistentClass = mappings.next();
+                final Class entityClass = persistentClass.getMappedClass();
+
+                if (entityClass != null)
                 {
-                    public ValueEncoder create(Class type)
+                    ValueEncoderFactory factory = new ValueEncoderFactory()
                     {
-                        return new HibernateEntityValueEncoder(entityClass, persistentClass, session, propertyAccess,
-                                typeCoercer, loggerSource.getLogger(entityClass));
-                    }
-                };
+                        public ValueEncoder create(Class type)
+                        {
+                            return new HibernateEntityValueEncoder(entityClass, persistentClass,
+                                    locator, propertyAccess,
+                                    typeCoercer, loggerSource.getLogger(entityClass));
+                        }
+                    };
 
-                configuration.add(entityClass, factory);
+                    configuration.add(entityClass, factory);
 
+                }
             }
         }
     }
@@ -140,13 +173,11 @@ public class HibernateModule
 
     /**
      * Contributes {@link ApplicationStateContribution}s for all registered Hibernate entity classes.
-     * 
-     * @param configuration
-     *            Configuration to contribute
+     *
+     * @param configuration Configuration to contribute
      * @param entitySessionStatePersistenceStrategyEnabled
-     *            indicates if contribution should take place
-     * @param sessionSource
-     *            creates Hibernate session
+     *                      indicates if contribution should take place
+     * @param sessionSource creates Hibernate session
      */
     public static void contributeApplicationStateManager(
             MappedConfiguration<Class, ApplicationStateContribution> configuration,

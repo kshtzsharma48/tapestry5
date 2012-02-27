@@ -28,4 +28,9 @@ public class HibernateConstants
      * @deprecated Use {@link org.apache.tapestry5.hibernate.HibernateSymbols#DEFAULT_CONFIGURATION} instead
      */
     public static final String DEFAULT_CONFIGURATION = HibernateSymbols.DEFAULT_CONFIGURATION;
+
+    /**
+     * Default factory ID
+     */
+    public static final String DEFAULT_FACTORY_ID = "default";
 }

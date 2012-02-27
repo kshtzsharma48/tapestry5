@@ -14,6 +14,7 @@
 
 package org.apache.tapestry5.internal.hibernate;
 
+import org.apache.tapestry5.hibernate.HibernateServiceLocator;
 import org.apache.tapestry5.ioc.Registry;
 import org.apache.tapestry5.ioc.services.PropertyAccess;
 import org.apache.tapestry5.ioc.services.TypeCoercer;
@@ -54,7 +55,7 @@ public class HibernateEntityValueEncoderTest extends IOCTestCase
     @Test
     public void to_client_id_null()
     {
-        Session session = mockSession();
+        HibernateServiceLocator locator = mockHibernateEntityServiceLocator();
         Logger logger = mockLogger();
 
         replay();
@@ -66,19 +67,25 @@ public class HibernateEntityValueEncoderTest extends IOCTestCase
         SampleEntity entity = new SampleEntity();
 
         HibernateEntityValueEncoder<SampleEntity> encoder = new HibernateEntityValueEncoder<SampleEntity>(
-                SampleEntity.class, persistentClass, session, access, typeCoercer, logger);
+                SampleEntity.class, persistentClass, locator, access, typeCoercer, logger);
 
         assertNull(encoder.toClient(entity));
 
         verify();
     }
 
+    private HibernateServiceLocator mockHibernateEntityServiceLocator()
+    {
+        return newMock(HibernateServiceLocator.class);
+    }
+
     @Test
     public void to_value_not_found()
     {
-        Session session = mockSession();
+        HibernateServiceLocator factoryServiceLocator = mockHibernateEntityServiceLocator();
         Logger logger = mockLogger();
-
+        Session session = mockSession();
+        expect(factoryServiceLocator.getSession(SampleEntity.class)).andReturn(session);
         expect(session.get(SampleEntity.class, new Long(12345))).andReturn(null);
 
         logger.error("Unable to convert client value '12345' into an entity instance.");
@@ -89,10 +96,9 @@ public class HibernateEntityValueEncoderTest extends IOCTestCase
         Property idProperty = new Property();
         idProperty.setName("id");
         persistentClass.setIdentifierProperty(idProperty);
-        SampleEntity entity = new SampleEntity();
 
         HibernateEntityValueEncoder<SampleEntity> encoder = new HibernateEntityValueEncoder<SampleEntity>(
-                SampleEntity.class, persistentClass, session, access, typeCoercer, logger);
+                SampleEntity.class, persistentClass, factoryServiceLocator, access, typeCoercer, logger);
 
         assertNull(encoder.toValue("12345"));
 
@@ -102,7 +108,7 @@ public class HibernateEntityValueEncoderTest extends IOCTestCase
     @Test
     public void to_value_bad_type_coercion()
     {
-        Session session = mockSession();
+        HibernateServiceLocator locator = mockHibernateEntityServiceLocator();
         Logger logger = mockLogger();
 
         replay();
@@ -113,7 +119,7 @@ public class HibernateEntityValueEncoderTest extends IOCTestCase
         persistentClass.setIdentifierProperty(idProperty);
 
         HibernateEntityValueEncoder<SampleEntity> encoder = new HibernateEntityValueEncoder<SampleEntity>(
-                SampleEntity.class, persistentClass, session, access, typeCoercer, logger);
+                SampleEntity.class, persistentClass, locator, access, typeCoercer, logger);
 
         try
         {

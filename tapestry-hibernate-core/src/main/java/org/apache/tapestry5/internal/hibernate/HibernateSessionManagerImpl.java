@@ -20,15 +20,17 @@ import org.apache.tapestry5.ioc.services.ThreadCleanupListener;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 
+import java.lang.annotation.Annotation;
+
 public class HibernateSessionManagerImpl implements HibernateSessionManager, ThreadCleanupListener
 {
     private final Session session;
 
     private Transaction transaction;
 
-    public HibernateSessionManagerImpl(HibernateSessionSource source)
+    public HibernateSessionManagerImpl(HibernateSessionSource source, Class<? extends Annotation> marker)
     {
-        session = source.create();
+        session = source.create(marker);
 
         startNewTransaction();
     }

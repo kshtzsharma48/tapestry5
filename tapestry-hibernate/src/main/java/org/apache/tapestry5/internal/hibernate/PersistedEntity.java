@@ -15,7 +15,7 @@
 package org.apache.tapestry5.internal.hibernate;
 
 import org.apache.tapestry5.annotations.ImmutableSessionPersistedObject;
-import org.hibernate.Session;
+import org.apache.tapestry5.hibernate.HibernateServiceLocator;
 
 import java.io.Serializable;
 
@@ -37,15 +37,16 @@ public class PersistedEntity implements Serializable
         this.id = id;
     }
 
-    public Object restore(Session session)
+    @SuppressWarnings({"unchecked"})
+    public Object restore(HibernateServiceLocator locator)
     {
         try
         {
-            return session.get(entityName, id);
-        }
-        catch (Exception ex)
+            return locator.getSession(entityName).get(entityName, id);
+        } catch (Exception ex)
         {
-            throw new RuntimeException(HibernateMessages.sessionPersistedEntityLoadFailure(entityName, id, ex));
+            throw new RuntimeException(
+                    HibernateMessages.sessionPersistedEntityLoadFailure(entityName, id, ex));
         }
     }
 

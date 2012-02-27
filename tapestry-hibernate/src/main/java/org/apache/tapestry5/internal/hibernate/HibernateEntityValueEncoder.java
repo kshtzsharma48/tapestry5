@@ -15,11 +15,11 @@
 package org.apache.tapestry5.internal.hibernate;
 
 import org.apache.tapestry5.ValueEncoder;
+import org.apache.tapestry5.hibernate.HibernateServiceLocator;
 import org.apache.tapestry5.ioc.internal.util.InternalUtils;
 import org.apache.tapestry5.ioc.services.PropertyAccess;
 import org.apache.tapestry5.ioc.services.PropertyAdapter;
 import org.apache.tapestry5.ioc.services.TypeCoercer;
-import org.hibernate.Session;
 import org.hibernate.mapping.PersistentClass;
 import org.hibernate.mapping.Property;
 import org.slf4j.Logger;
@@ -30,7 +30,7 @@ public final class HibernateEntityValueEncoder<E> implements ValueEncoder<E>
 {
     private final Class<E> entityClass;
 
-    private final Session session;
+    private HibernateServiceLocator locator;
 
     private final TypeCoercer typeCoercer;
 
@@ -38,11 +38,12 @@ public final class HibernateEntityValueEncoder<E> implements ValueEncoder<E>
 
     private final Logger logger;
 
-    public HibernateEntityValueEncoder(Class<E> entityClass, PersistentClass persistentClass, Session session,
+    public HibernateEntityValueEncoder(Class<E> entityClass, PersistentClass persistentClass,
+                                       HibernateServiceLocator locator,
                                        PropertyAccess propertyAccess, TypeCoercer typeCoercer, Logger logger)
     {
         this.entityClass = entityClass;
-        this.session = session;
+        this.locator = locator;
         this.typeCoercer = typeCoercer;
         this.logger = logger;
 
@@ -72,7 +73,7 @@ public final class HibernateEntityValueEncoder<E> implements ValueEncoder<E>
         if (InternalUtils.isBlank(clientValue))
             return null;
 
-        Object id = null;
+        Object id;
 
         try
         {
@@ -87,7 +88,7 @@ public final class HibernateEntityValueEncoder<E> implements ValueEncoder<E>
 
         Serializable ser = (Serializable) id;
 
-        E result = (E) session.get(entityClass, ser);
+        E result = (E) locator.getSession(entityClass).get(entityClass, ser);
 
         if (result == null)
         {

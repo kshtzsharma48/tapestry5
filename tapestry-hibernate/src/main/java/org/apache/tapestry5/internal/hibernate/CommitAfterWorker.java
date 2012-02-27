@@ -14,8 +14,10 @@
 
 package org.apache.tapestry5.internal.hibernate;
 
+import org.apache.tapestry5.hibernate.HibernateServiceLocator;
 import org.apache.tapestry5.hibernate.HibernateSessionManager;
 import org.apache.tapestry5.hibernate.annotations.CommitAfter;
+import org.apache.tapestry5.hibernate.annotations.DefaultFactory;
 import org.apache.tapestry5.model.MutableComponentModel;
 import org.apache.tapestry5.plastic.MethodAdvice;
 import org.apache.tapestry5.plastic.MethodInvocation;
@@ -24,46 +26,89 @@ import org.apache.tapestry5.plastic.PlasticMethod;
 import org.apache.tapestry5.services.transform.ComponentClassTransformWorker2;
 import org.apache.tapestry5.services.transform.TransformationSupport;
 
+import java.lang.annotation.Annotation;
+
 /**
- * Searches for methods that have the {@link org.apache.tapestry5.hibernate.annotations.CommitAfter} annotation and adds
- * logic around the method to commit or abort the transaction. The commit/abort logic is the same as for the
+ * Searches for methods that have the {@link org.apache.tapestry5.hibernate.annotations
+ * .CommitAfter} annotation and adds
+ * logic around the method to commit or abort the transaction. The commit/abort logic is the same
+ * as for the
  * {@link org.apache.tapestry5.hibernate.HibernateTransactionDecorator} service.
  */
 public class CommitAfterWorker implements ComponentClassTransformWorker2
 {
-    private final HibernateSessionManager manager;
+    private HibernateServiceLocator locator;
 
-    private final MethodAdvice advice = new MethodAdvice()
+    public CommitAfterWorker(HibernateServiceLocator locator)
     {
-        public void advise(MethodInvocation invocation)
-        {
-            try
-            {
-                invocation.proceed();
-
-                // Success or checked exception:
-
-                manager.commit();
-            }
-            catch (RuntimeException ex)
-            {
-                manager.abort();
-
-                throw ex;
-            }
-        }
-    };
-
-    public CommitAfterWorker(HibernateSessionManager manager)
-    {
-        this.manager = manager;
+        this.locator = locator;
     }
 
-    public void transform(PlasticClass plasticClass, TransformationSupport support, MutableComponentModel model)
+    public void transform(PlasticClass plasticClass, TransformationSupport support,
+                          MutableComponentModel model)
     {
         for (PlasticMethod method : plasticClass.getMethodsWithAnnotation(CommitAfter.class))
         {
-            method.addAdvice(advice);
+            method.addAdvice(getCommitAfterAdvice(method));
         }
+    }
+
+    public MethodAdvice getCommitAfterAdvice(PlasticMethod method)
+    {
+        Class<? extends Annotation> marker = getFactoryMarker(method);
+
+        HibernateSessionManager manager = locator.getSessionManagerByMarker(marker);
+
+        return getAdvice(manager);
+    }
+
+    private Class<? extends Annotation> getFactoryMarker(PlasticMethod method)
+    {
+        Class<? extends Annotation> selected = null;
+
+        for (Class<? extends Annotation> marker : locator.getMarkers())
+        {
+            if (method.hasAnnotation(marker))
+            {
+                if (selected != null)
+                {
+                    throw new RuntimeException(
+                            HibernateCoreMessages.multipleMarkersNotAllowed(
+                                    marker, selected,
+                                    method.getPlasticClass().getClassName(), method.getDescription().methodName));
+                }
+                selected = marker;
+            }
+        }
+
+        if (selected == null)
+        {
+            selected = DefaultFactory.class;
+        }
+
+        return selected;
+    }
+
+    private MethodAdvice getAdvice(final HibernateSessionManager manager)
+    {
+        return new MethodAdvice()
+        {
+            public void advise(MethodInvocation invocation)
+            {
+                try
+                {
+                    invocation.proceed();
+
+                    // Success or checked exception:
+
+                    manager.commit();
+                } catch (RuntimeException ex)
+                {
+                    manager.abort();
+
+                    throw ex;
+                }
+            }
+        };
     }
 }

@@ -15,72 +15,234 @@
 package org.apache.tapestry5.internal.hibernate;
 
 import org.apache.tapestry5.hibernate.HibernateConfigurer;
-import org.apache.tapestry5.hibernate.HibernateEntityPackageManager;
 import org.apache.tapestry5.hibernate.HibernateSessionSource;
+import org.apache.tapestry5.hibernate.annotations.DefaultFactory;
+import org.apache.tapestry5.ioc.IOCUtilities;
+import org.apache.tapestry5.ioc.Registry;
+import org.apache.tapestry5.ioc.RegistryBuilder;
 import org.apache.tapestry5.ioc.internal.services.ClassNameLocatorImpl;
 import org.apache.tapestry5.ioc.internal.services.ClasspathURLConverterImpl;
 import org.apache.tapestry5.ioc.internal.util.CollectionFactory;
+import org.apache.tapestry5.ioc.services.ClassNameLocator;
 import org.apache.tapestry5.ioc.test.IOCTestCase;
-import org.apache.tapestry5.ioc.test.TestBase;
 import org.example.app0.entities.User;
+import org.example.app0.entities.services.AppModule;
+import org.example.app1.NonDefaultFactory;
+import org.example.app1.entities.User2;
 import org.hibernate.Session;
 import org.hibernate.cfg.Configuration;
-import org.hibernate.metadata.ClassMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
+import java.lang.annotation.Annotation;
+import java.util.Properties;
 
 public class HibernateSessionSourceImplTest extends IOCTestCase
 {
-    private final Logger log = LoggerFactory.getLogger("tapestry.hibernate.HibernateSessionSourceTest");
+    private final Logger logger = LoggerFactory.getLogger(
+            "tapestry.hibernate.HibernateSessionSourceTest");
 
-    @Test
-    public void startup_without_packages()
+    @Test(expectedExceptions = RuntimeException.class,
+            expectedExceptionsMessageRegExp = "No hibernate configuration found")
+    public void startup_with_no_configurer_throws_exception()
     {
-        Collection<String> packageNames = CollectionFactory.newList("org.example.myapp.entities",
-                "org.example.app0.entities");
-        HibernateEntityPackageManager packageManager = newMock(HibernateEntityPackageManager.class);
-        TestBase.expect(packageManager.getPackageNames()).andReturn(packageNames);
+        ClassNameLocator classNameLocator = mockClassNameLocator();
 
-        List<HibernateConfigurer> filters = Arrays.asList(new DefaultHibernateConfigurer(true),
-                new PackageNameHibernateConfigurer(packageManager, new ClassNameLocatorImpl(
-                        new ClasspathURLConverterImpl())));
+        @SuppressWarnings({"UnusedDeclaration"})
+        HibernateSessionSource source = new HibernateSessionSourceImpl(logger, classNameLocator,
+                false, CollectionFactory.<HibernateConfigurer>newList());
 
-        replay();
-        HibernateSessionSource source = new HibernateSessionSourceImpl(log, filters);
-
-        Session session = source.create();
-        Assert.assertNotNull(session);
-
-        // make sure it found the entity in the package
-        ClassMetadata meta = session.getSessionFactory().getClassMetadata(User.class);
-        Assert.assertEquals(meta.getEntityName(), "org.example.app0.entities.User");
-
-        verify();
     }
 
     @Test
-    public void get_configuration()
+    public void startup_with_custom_hibernate_configuration_works()
     {
-        HibernateConfigurer configurer = new HibernateConfigurer()
+        RegistryBuilder builder = new RegistryBuilder();
+        builder.add(AppModule.class);
+
+        IOCUtilities.addDefaultModules(builder);
+
+        Registry registry = builder.build();
+
+        Session session = registry.getService(Session.class);
+        User user = new User();
+        session.save(user);
+    }
+
+    @Test
+    public void startup_with_default_configurer_and_default_configuration_true_uses_xml()
+    {
+        ClassNameLocator classNameLocator = new ClassNameLocatorImpl(new
+                ClasspathURLConverterImpl());
+
+        HibernateConfigurer defaultConfigurer = new HibernateConfigurer()
         {
             public void configure(Configuration configuration)
             {
-                configuration.setProperty("foo", "bar");
-                configuration.configure();
+
+            }
+
+            public Class<? extends Annotation> getMarker()
+            {
+                return DefaultFactory.class;
+            }
+
+            public String[] getPackageNames()
+            {
+                return new String[]{"org.example.app0.entities"};
             }
         };
-        HibernateSessionSource source = new HibernateSessionSourceImpl(log, Arrays.asList(configurer));
 
-        Configuration config = source.getConfiguration();
-        Assert.assertNotNull(config);
-        Assert.assertEquals("bar", config.getProperty("foo"));
+        @SuppressWarnings({"UnusedDeclaration"})
+        HibernateSessionSource source = new HibernateSessionSourceImpl(logger, classNameLocator,
+                true, CollectionFactory.newList(defaultConfigurer));
 
-        // Configuration was immutable in 5.1, but Hibernate 3.6.0.Final made that impossible
+        assertNotNull(source.getConfiguration());
     }
+
+    @Test(expectedExceptions = IllegalArgumentException.class)
+    public void startup_with_no_default_configurer_throws_exception_if_default_configuration_is_accessed()
+    {
+        ClassNameLocator classNameLocator = mockClassNameLocator();
+
+        HibernateConfigurer nonDefaultConfigurer = createConfigurer(new String[0], NonDefaultFactory.class);
+
+        @SuppressWarnings({"UnusedDeclaration"})
+        HibernateSessionSource source = new HibernateSessionSourceImpl(logger, classNameLocator,
+                false, CollectionFactory.newList(nonDefaultConfigurer));
+
+        source.getConfiguration();
+    }
+
+
+    @Test(expectedExceptions = IllegalArgumentException.class)
+    public void startup_with_no_default_configurer_throws_exception_if_default_sf_is_accessed()
+    {
+        ClassNameLocator classNameLocator = mockClassNameLocator();
+
+        HibernateConfigurer nonDefaultConfigurer = createConfigurer(new String[0], NonDefaultFactory.class);
+
+        @SuppressWarnings({"UnusedDeclaration"})
+        HibernateSessionSource source = new HibernateSessionSourceImpl(logger, classNameLocator,
+                false, CollectionFactory.newList(nonDefaultConfigurer));
+
+        source.getSessionFactory();
+    }
+
+
+    @Test
+    public void startup_with_default_configurer_sets_up_configuration()
+    {
+        ClassNameLocator classNameLocator = mockClassNameLocator();
+
+        HibernateConfigurer defaultConfigurer = createConfigurer(new String[0],
+                DefaultFactory.class);
+
+        HibernateSessionSource source = new HibernateSessionSourceImpl(logger, classNameLocator,
+                false, CollectionFactory.newList(defaultConfigurer));
+
+        assertNotNull(source.getConfiguration());
+        assertNotNull(source.getConfiguration(DefaultFactory.class));
+    }
+
+    @Test
+    public void startup_with_default_configurer_maps_all_package_entities()
+    {
+        ClassNameLocator classNameLocator = new ClassNameLocatorImpl(new
+                ClasspathURLConverterImpl());
+
+        HibernateConfigurer defaultConfigurer = createConfigurer(
+                new String[]{
+                        "org.example.app0.entities"
+                }, DefaultFactory.class);
+
+        HibernateSessionSource source = new HibernateSessionSourceImpl(logger, classNameLocator,
+                false, CollectionFactory.newList(defaultConfigurer));
+
+        assertNotNull(source.getConfiguration().getClassMapping(User.class.getName()));
+        assertNotNull(source.getSessionFactoryByEntityClass(User.class));
+    }
+
+    @Test
+    public void startup_with_multiple_configurers()
+    {
+        ClassNameLocator classNameLocator = new ClassNameLocatorImpl(new
+                ClasspathURLConverterImpl());
+
+        HibernateConfigurer defaultConfigurer = createConfigurer(
+                new String[]{
+                        "org.example.app0.entities"
+                }, DefaultFactory.class);
+
+        HibernateConfigurer nonDefaultConfigurer = createConfigurer(
+                new String[]{
+                        "org.example.app1.entities"
+                }, NonDefaultFactory.class);
+
+        HibernateSessionSource source = new HibernateSessionSourceImpl(logger, classNameLocator,
+                false, CollectionFactory.newList(defaultConfigurer, nonDefaultConfigurer));
+
+        assertNotNull(source.getConfiguration().getClassMapping(User.class.getName()));
+        assertNotNull(source.getSessionFactoryByEntityClass(User.class));
+
+        assertNotNull(source.getConfiguration(NonDefaultFactory.class).getClassMapping(
+                User2.class.getName()
+        ));
+
+        assertNotNull(source.getSessionFactoryByEntityClass(User2.class));
+        assertTrue(source.getSessionFactory() == source.getSessionFactoryByEntityClass(User.class));
+        assertTrue(source.getSessionFactory() != source.getSessionFactoryByEntityClass(User2.class));
+    }
+
+    @Test(expectedExceptions = IllegalArgumentException.class,
+            expectedExceptionsMessageRegExp = "Entity : java.lang.String is not bound to any of the configured session factories")
+    public void factory_id_does_not_exist()
+    {
+        ClassNameLocator classNameLocator = new ClassNameLocatorImpl(new
+                ClasspathURLConverterImpl());
+
+        HibernateConfigurer defaultConfigurer = createConfigurer(new String[]{"org.example.app0.entities"}, DefaultFactory.class);
+
+        HibernateSessionSource source = new HibernateSessionSourceImpl(logger, classNameLocator,
+                false, CollectionFactory.newList(defaultConfigurer));
+
+        source.getFactoryMarker(String.class);
+    }
+
+
+    private HibernateConfigurer createConfigurer(final String[] packageNames, final Class<? extends Annotation> marker)
+    {
+        return new HibernateConfigurer()
+        {
+            public void configure(Configuration configuration)
+            {
+                Properties properties = new Properties();
+                properties.put("hibernate.connection.driver_class", "org.hsqldb.jdbcDriver");
+                properties.put("hibernate.connection.url", "jdbc:hsqldb:mem:test");
+                properties.put("hibernate.connection.username", "sa");
+                properties.put("hibernate.connection.password", "");
+                properties.put("hibernate.dialect", "org.hibernate.dialect.HSQLDialect");
+
+                configuration.setProperties(properties);
+            }
+
+            public Class<? extends Annotation> getMarker()
+            {
+                return marker;
+            }
+
+            public String[] getPackageNames()
+            {
+                return packageNames;
+            }
+        };
+    }
+
+    private ClassNameLocator mockClassNameLocator()
+    {
+        return newMock(ClassNameLocator.class);
+    }
+
+
 }

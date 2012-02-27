@@ -14,8 +14,8 @@
 
 package org.apache.tapestry5.internal.hibernate;
 
+import org.apache.tapestry5.hibernate.HibernateServiceLocator;
 import org.apache.tapestry5.test.TapestryTestCase;
-import org.hibernate.HibernateException;
 import org.hibernate.Session;
 import org.testng.annotations.Test;
 
@@ -25,10 +25,11 @@ public class EntityPersistentFieldStrategyTest extends TapestryTestCase
     public void not_an_entity()
     {
         String nonEntity = "foo";
-        Session session = newMock(Session.class);
-        EntityPersistentFieldStrategy strategy = new EntityPersistentFieldStrategy(session, null);
+        HibernateServiceLocator locator = mockHibernateEntityServiceLocator();
 
-        expect(session.getEntityName(nonEntity)).andThrow(new HibernateException("error"));
+        EntityPersistentFieldStrategy strategy = new EntityPersistentFieldStrategy(locator, null);
+
+        expect(locator.getSession(String.class)).andThrow(new IllegalArgumentException());
 
         replay();
 
@@ -37,12 +38,21 @@ public class EntityPersistentFieldStrategyTest extends TapestryTestCase
             strategy.postChange("pageName", "", "fieldName", nonEntity);
 
             unreachable();
-        }
-        catch (IllegalArgumentException ex)
+        } catch (IllegalArgumentException ex)
         {
             assertEquals(ex.getMessage(), "Failed persisting an entity in the session. Only entities attached to a Hibernate Session can be persisted. entity: foo");
         }
 
         verify();
+    }
+
+    private Session mockHibernateSession()
+    {
+        return newMock(Session.class);
+    }
+
+    private HibernateServiceLocator mockHibernateEntityServiceLocator()
+    {
+        return newMock(HibernateServiceLocator.class);
     }
 }

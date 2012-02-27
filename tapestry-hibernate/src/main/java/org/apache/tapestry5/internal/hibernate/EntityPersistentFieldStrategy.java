@@ -14,9 +14,9 @@
 
 package org.apache.tapestry5.internal.hibernate;
 
+import org.apache.tapestry5.hibernate.HibernateServiceLocator;
 import org.apache.tapestry5.internal.services.AbstractSessionPersistentFieldStrategy;
 import org.apache.tapestry5.services.Request;
-import org.hibernate.HibernateException;
 import org.hibernate.Session;
 
 import java.io.Serializable;
@@ -28,13 +28,14 @@ import java.io.Serializable;
  */
 public class EntityPersistentFieldStrategy extends AbstractSessionPersistentFieldStrategy
 {
-    private final Session session;
+    private final HibernateServiceLocator locator;
 
-    public EntityPersistentFieldStrategy(Session session, Request request)
+    public EntityPersistentFieldStrategy(HibernateServiceLocator locator,
+                                         Request request)
     {
         super("entity:", request);
 
-        this.session = session;
+        this.locator = locator;
     }
 
     @Override
@@ -42,13 +43,14 @@ public class EntityPersistentFieldStrategy extends AbstractSessionPersistentFiel
     {
         try
         {
+            Session session = locator.getSession(newValue.getClass());
             String entityName = session.getEntityName(newValue);
             Serializable id = session.getIdentifier(newValue);
 
             return new PersistedEntity(entityName, id);
-        }
-        catch (HibernateException ex)
+        } catch (IllegalArgumentException ex)
         {
+            // Wrap with a more appropriate message
             throw new IllegalArgumentException(HibernateMessages.entityNotAttached(newValue), ex);
         }
     }
@@ -58,6 +60,6 @@ public class EntityPersistentFieldStrategy extends AbstractSessionPersistentFiel
     {
         PersistedEntity persisted = (PersistedEntity) persistedValue;
 
-        return persisted.restore(session);
+        return persisted.restore(locator);
     }
 }

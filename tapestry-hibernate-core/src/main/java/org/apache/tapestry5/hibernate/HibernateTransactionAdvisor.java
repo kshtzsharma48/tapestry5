@@ -30,4 +30,5 @@ public interface HibernateTransactionAdvisor
      * @param receiver advice receiver
      */
     void addTransactionCommitAdvice(MethodAdviceReceiver receiver);
+
 }

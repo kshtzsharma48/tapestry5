@@ -68,29 +68,29 @@ public class TapestryHibernateIntegrationTests extends AbstractIntegrationTestSu
         clickAndWait("link=set to transient");
         assertTextPresent("Error persisting");
     }
-    
+
     public void sso_entities()
     {
     	open("/ssoentity");
         assertEquals(getText("//span[@id='name']").length(), 0);
         assertText("//span[@id='persistedEntityClassName']", User.class.getName());
-        
+
         clickAndWait("link=persist entity");
         assertText("//span[@id='name']", "name");
         assertText("//span[@id='persistedEntityClassName']", PersistedEntity.class.getName());
-        
+
         // can set back to null
         clickAndWait("link=set to null");
         assertEquals(getText("//span[@id='name']").length(), 0);
         assertText("//span[@id='persistedEntityClassName']", User.class.getName());
-        
+
         clickAndWait("link=persist entity");
         assertText("//span[@id='name']", "name");
         assertText("//span[@id='persistedEntityClassName']", PersistedEntity.class.getName());
         clickAndWait("link=delete");
         assertEquals(getText("//span[@id='name']").length(), 0);
         assertText("//span[@id='persistedEntityClassName']", User.class.getName());
-        
+
         clickAndWait("link=persist entity");
         assertText("//span[@id='name']", "name");
         assertText("//span[@id='persistedEntityClassName']", PersistedEntity.class.getName());
@@ -147,15 +147,15 @@ public class TapestryHibernateIntegrationTests extends AbstractIntegrationTestSu
 
         assertText("//td[@class='firstName t-sort-column-descending']", "Joe_9");
     }
-    
+
     public void hibernate_statistics()
     {
     	open(BASE_URL + "hibernate/Statistics");
-    	
+
     	assertTextPresent("Hibernate Statistics");
-    	
+
     	assertTextPresent("Entities Statistics");
-    	
+
     	assertTextPresent(User.class.getName());
     }
 

@@ -45,4 +45,5 @@ public class HibernateSymbols
      * @since 5.2.0.0
      */
     public static final String ENTITY_SESSION_STATE_PERSISTENCE_STRATEGY_ENABLED = "tapestry.hibernate.entity-session-state-persistence-strategy-enabled";
+
 }

@@ -14,21 +14,25 @@
 
 package org.apache.tapestry5.hibernate.annotations;
 
+import org.apache.tapestry5.hibernate.HibernateConstants;
 import org.apache.tapestry5.ioc.annotations.UseWith;
-import org.apache.tapestry5.ioc.annotations.AnnotationUseContext;
 
+import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
-import static java.lang.annotation.ElementType.METHOD;
 import java.lang.annotation.Retention;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Target;
 
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static org.apache.tapestry5.ioc.annotations.AnnotationUseContext.*;
 
 /**
- * Marks a method of a service (or a component method) as transactional: the active transaction should {@linkplain
- * org.apache.tapestry5.hibernate.HibernateSessionManager#commit() commit} after invoking the method.  Runtime
- * exceptions will abort the transaction, checked exceptions will <em>also commit</em> the transaction.
+ * Marks a method of a service (or a component method) as transactional: the active transaction
+ * should {@linkplain
+ * org.apache.tapestry5.hibernate.HibernateSessionManager#commit() commit} after invoking the
+ * method.  Runtime
+ * exceptions will abort the transaction, checked exceptions will <em>also commit</em> the
+ * transaction.
  *
  * @see org.apache.tapestry5.hibernate.HibernateTransactionAdvisor
  * @see org.apache.tapestry5.hibernate.HibernateTransactionDecorator
@@ -36,8 +40,6 @@ import static org.apache.tapestry5.ioc.annotations.AnnotationUseContext.*;
 @Target(METHOD)
 @Retention(RUNTIME)
 @Documented
-@UseWith({COMPONENT, MIXIN, PAGE})
-public @interface CommitAfter
-{
-
+@UseWith( {COMPONENT, MIXIN, PAGE})
+public @interface CommitAfter {
 }

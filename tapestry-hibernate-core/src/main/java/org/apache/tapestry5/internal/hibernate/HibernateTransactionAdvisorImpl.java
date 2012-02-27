@@ -14,57 +14,100 @@
 
 package org.apache.tapestry5.internal.hibernate;
 
+import org.apache.tapestry5.hibernate.HibernateServiceLocator;
 import org.apache.tapestry5.hibernate.HibernateSessionManager;
 import org.apache.tapestry5.hibernate.HibernateTransactionAdvisor;
 import org.apache.tapestry5.hibernate.annotations.CommitAfter;
-import org.apache.tapestry5.ioc.Invocation;
-import org.apache.tapestry5.ioc.MethodAdvice;
+import org.apache.tapestry5.hibernate.annotations.DefaultFactory;
+import org.apache.tapestry5.hibernate.annotations.FactoryMarker;
 import org.apache.tapestry5.ioc.MethodAdviceReceiver;
+import org.apache.tapestry5.plastic.MethodAdvice;
+import org.apache.tapestry5.plastic.MethodInvocation;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 
 public class HibernateTransactionAdvisorImpl implements HibernateTransactionAdvisor
 {
-    private final HibernateSessionManager manager;
+    private final HibernateServiceLocator locator;
 
-    /**
-     * The rules for advice are the same for any method: commit on success or checked exception, abort on thrown
-     * exception ... so we can use a single shared advice object.
-     */
-    private final MethodAdvice advice = new MethodAdvice()
+    public HibernateTransactionAdvisorImpl(HibernateServiceLocator locator)
     {
-        public void advise(Invocation invocation)
-        {
-            try
-            {
-                invocation.proceed();
-            }
-            catch (RuntimeException ex)
-            {
-                manager.abort();
-
-                throw ex;
-            }
-
-            // For success or checked exception, commit the transaction.
-
-            manager.commit();
-        }
-    };
-
-    public HibernateTransactionAdvisorImpl(HibernateSessionManager manager)
-    {
-        this.manager = manager;
+        this.locator = locator;
     }
 
+    @SuppressWarnings({"unchecked"})
     public void addTransactionCommitAdvice(MethodAdviceReceiver receiver)
     {
-        for (Method m : receiver.getInterface().getMethods())
+        for (Method method : receiver.getInterface().getMethods())
         {
-            if (m.getAnnotation(CommitAfter.class) != null)
+            CommitAfter annotation = method.getAnnotation(CommitAfter.class);
+
+            if (annotation != null)
             {
-                receiver.adviseMethod(m, advice);
+                receiver.adviseMethod(method, getCommitAfterAdvice(method));
             }
         }
+    }
+
+    public MethodAdvice getCommitAfterAdvice(Method method)
+    {
+        Class<? extends Annotation> marker = getFactoryMarker(method);
+
+        HibernateSessionManager manager = locator.getSessionManagerByMarker(marker);
+
+        return getAdvice(manager);
+    }
+
+    private Class<? extends Annotation> getFactoryMarker(Method method)
+    {
+        Class<? extends Annotation> selected = null;
+
+        for (Class<? extends Annotation> marker : locator.getMarkers())
+        {
+
+            Annotation match = method.getAnnotation(marker);
+            if (match != null)
+            {
+                if (selected != null)
+                {
+                    throw new RuntimeException(
+                            HibernateCoreMessages.multipleMarkersNotAllowed(
+                                     marker, selected,
+                                    method.getDeclaringClass().getName(), method.getName()));
+                }
+                selected = marker;
+            }
+        }
+
+        if (selected == null)
+        {
+            selected = DefaultFactory.class;
+        }
+
+        return selected;
+    }
+
+    private MethodAdvice getAdvice(final HibernateSessionManager manager)
+    {
+        return new MethodAdvice()
+        {
+            public void advise(MethodInvocation invocation)
+            {
+                try
+                {
+                    invocation.proceed();
+
+                    // Success or checked exception:
+
+                    manager.commit();
+                } catch (RuntimeException ex)
+                {
+                    manager.abort();
+
+                    throw ex;
+                }
+            }
+        };
     }
 }

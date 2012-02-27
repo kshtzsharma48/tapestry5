@@ -18,6 +18,7 @@ import org.apache.tapestry5.ioc.Messages;
 import org.apache.tapestry5.ioc.internal.util.InternalUtils;
 import org.apache.tapestry5.ioc.internal.util.MessagesImpl;
 
+import java.lang.annotation.Annotation;
 import java.util.Collection;
 
 public class HibernateCoreMessages
@@ -32,5 +33,35 @@ public class HibernateCoreMessages
     public static String entityCatalog(Collection entityNames)
     {
         return MESSAGES.format("entity-catalog", InternalUtils.joinSorted(entityNames));
+    }
+
+    public static String factoryDoesNotExist(String factoryId)
+    {
+        return MESSAGES.format("factory-does-not-exist", factoryId);
+    }
+
+    public static String entityNotBound(String entityName)
+    {
+        return MESSAGES.format("entity-not-bound", entityName);
+    }
+
+    public static String noConfigurationFound()
+    {
+        return MESSAGES.format("no-configuration-found");
+    }
+
+    public static String noDefaultConfigurationFound()
+    {
+        return MESSAGES.format("no-default-configuration-found");
+    }
+
+    public static String multipleMarkersNotAllowed(
+            Class<? extends Annotation> match,
+            Class<? extends Annotation> selected,
+            String className,
+            String methodName)
+    {
+        return MESSAGES.format("multiple-markers-not-allowed", className, methodName,
+                selected.getCanonicalName(), match.getCanonicalName());
     }
 }

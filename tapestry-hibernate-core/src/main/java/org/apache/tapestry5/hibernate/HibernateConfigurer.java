@@ -16,6 +16,8 @@ package org.apache.tapestry5.hibernate;
 
 import org.hibernate.cfg.Configuration;
 
+import java.lang.annotation.Annotation;
+
 /**
  * Defines the interface for a chain-of-command that updates Hibernate configuration in some way before the {@link
  * org.hibernate.SessionFactory} is created.
@@ -26,4 +28,16 @@ public interface HibernateConfigurer
      * Passed the configuration so as to make changes.
      */
     void configure(Configuration configuration);
+
+    /**
+     * Factory Id for which this configurer is meant for
+     */
+    Class<? extends Annotation> getMarker();
+
+    /**
+     * Entity package names
+     * 
+     * @return
+     */
+    String[] getPackageNames();
 }
