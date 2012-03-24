@@ -26,7 +26,7 @@ import org.apache.tapestry5.ioc.internal.util.CollectionFactory;
 import org.apache.tapestry5.ioc.services.ClassNameLocator;
 import org.apache.tapestry5.ioc.test.IOCTestCase;
 import org.example.app0.entities.User;
-import org.example.app0.entities.services.AppModule;
+import org.example.app0.services.AppModule;
 import org.example.app1.NonDefaultFactory;
 import org.example.app1.entities.User2;
 import org.hibernate.Session;
